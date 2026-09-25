@@ -1,413 +1,349 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LASD // MDT</title>
-<style>
-  :root{
-    --bg:#0a0d0a;
-    --panel:#10140f;
-    --line:#243024;
-    --amber:#d9a441;
-    --amber-dim:#7a6230;
-    --green:#5c8a5c;
-    --text:#c9d2c4;
-    --text-dim:#6f7d6a;
-    --danger:#b0453f;
-    box-sizing:border-box;
-  }
-  *{box-sizing:border-box;}
-  html,body{height:100%;margin:0;}
-  @media (prefers-reduced-motion: reduce){
-    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
-  }
-  body{
-    background:var(--bg);
-    color:var(--text);
-    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
-    padding-top:env(safe-area-inset-top,0px);
-    padding-bottom:env(safe-area-inset-bottom,0px);
-    min-height:100%;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 28px 28px;
-  }
-  @keyframes scanline{
-    0%{ transform:translateY(-100%); }
-    100%{ transform:translateY(100vh); }
-  }
-  #scan{
-    position:fixed; left:0; right:0; top:0; height:120px; z-index:60;
-    pointer-events:none;
-    background:linear-gradient(to bottom, transparent, rgba(217,164,65,0.05), transparent);
-    animation:scanline 5s linear infinite;
-  }
-  @keyframes bootIn{
-    0%{ opacity:0; }
-    100%{ opacity:1; }
-  }
-  @keyframes typeCursor{
-    0%,100%{ opacity:1; } 50%{ opacity:0; }
-  }
-  #boot-screen{
-    position:fixed; inset:0; z-index:70;
-    background:#060806;
-    display:flex; align-items:center; justify-content:center;
-    animation:bootIn 0.2s ease-out;
-  }
-  #boot-screen .boot-text{
-    font-size:13px; color:var(--green); letter-spacing:1px;
-  }
-  #boot-screen .boot-text span.cursor{
-    animation:typeCursor 0.8s steps(1) infinite;
-  }
-  @keyframes fadeUp{
-    0%{ opacity:0; transform:translateY(14px); }
-    100%{ opacity:1; transform:translateY(0); }
-  }
-  #login-screen{
-    position:fixed; inset:0;
-    display:flex; align-items:center; justify-content:center;
-    background:radial-gradient(ellipse at center, #10140f 0%, #060806 100%);
-    z-index:50;
-    padding:24px;
-    opacity:0;
-  }
-  #login-screen.reveal{
-    animation:fadeUp 0.5s ease-out forwards;
-  }
-  .login-box{
-    width:100%; max-width:380px;
-    border:1px solid var(--line);
-    background:var(--panel);
-    padding:32px 28px;
-    position:relative;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-  }
-  .login-box:focus-within{
-    border-color: var(--amber-dim);
-    box-shadow: 0 0 0 1px rgba(217,164,65,0.08), 0 0 24px rgba(217,164,65,0.06);
-  }
-  @keyframes sweep{
-    0%{ background-position: -140% 0; }
-    100%{ background-position: 240% 0; }
-  }
-  .login-box::before{
-    content:"";
-    position:absolute; top:0; left:0; right:0; height:3px;
-    background:linear-gradient(90deg, var(--amber-dim), var(--amber), var(--amber-dim));
-    background-size: 200% 100%;
-    animation: sweep 3.5s linear infinite;
-  }
-  .badge-mark{ font-size:11px; letter-spacing:2px; color:var(--amber); margin-bottom:4px; }
-  .login-box h1{ font-size:20px; margin:0 0 2px 0; color:var(--text); font-weight:600; }
-  .login-sub{ font-size:12px; color:var(--text-dim); margin-bottom:24px; }
-  .field{ margin-bottom:14px; }
-  .field label{ display:block; font-size:11px; color:var(--text-dim); margin-bottom:5px; }
-  .field input{ width:100%; background:#080a08; border:1px solid var(--line); color:var(--text); padding:10px 11px; font-family:inherit; font-size:14px; outline:none; transition: border-color 0.25s ease, background 0.25s ease; }
-  .field input:focus{ border-color:var(--amber-dim); background:#0c0f0b; }
-  #login-error{ font-size:12px; color:var(--danger); min-height:16px; margin-bottom:8px; }
-  .login-btn{ width:100%; background:var(--amber); color:#1a1406; border:none; padding:11px; font-family:inherit; font-size:13px; font-weight:600; letter-spacing:0.5px; cursor:pointer; margin-top:6px; transition: background 0.2s ease, transform 0.1s ease; }
-  .login-btn:hover{ background:#e8b755; }
-  .login-btn:active{ transform:scale(0.98); }
-  @keyframes shake{ 0%,100%{ transform:translateX(0); } 20%{ transform:translateX(-6px); } 40%{ transform:translateX(5px); } 60%{ transform:translateX(-4px); } 80%{ transform:translateX(3px); } }
-  .login-box.shake{ animation: shake 0.4s ease; }
-  .login-foot{ font-size:10px; color:var(--text-dim); margin-top:18px; line-height:1.6; }
-  #app{ display:none; min-height:100%; }
-  #app.show{ animation: fadeUp 0.45s ease-out; }
-  header{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; gap:10px; }
-  #clock .colon{ animation: typeCursor 1s steps(1) infinite; }
-  header .left{ display:flex; align-items:center; gap:12px; }
-  header .mark{ color:var(--amber); font-weight:600; font-size:14px; letter-spacing:1px; }
-  header .sep{ color:var(--line); }
-  header .unit{ font-size:12px; color:var(--text-dim); }
-  header .right{ display:flex; align-items:center; gap:16px; font-size:12px; color:var(--text-dim); }
-  #logout-btn{ background:none; border:1px solid var(--line); color:var(--text-dim); font-family:inherit; font-size:11px; padding:6px 10px; cursor:pointer; transition: border-color 0.2s ease, color 0.2s ease; }
-  #logout-btn:hover{ border-color:var(--danger); color:var(--danger); }
-  main{ padding:20px; max-width:920px; margin:0 auto; }
-  .tabs{ display:flex; gap:2px; margin-bottom:18px; border-bottom:1px solid var(--line); }
-  .tab{ padding:9px 16px; font-size:12px; color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; user-select:none; transition: color 0.2s ease, border-color 0.2s ease; }
-  .tab:hover{ color:var(--text); }
-  .tab.active{ color:var(--amber); border-bottom-color:var(--amber); }
-  .panel{ border:1px solid var(--line); background:var(--panel); padding:20px; animation: fadeUp 0.3s ease-out; }
-  .search-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
-  .search-row .field{ flex:1; min-width:180px; margin-bottom:0; }
-  .search-row .field label{ font-size:10px; color:var(--text-dim); margin-bottom:5px; }
-  .search-row input{ width:100%; background:#080a08; border:1px solid var(--line); color:var(--text); padding:9px 10px; font-family:inherit; font-size:13px; outline:none; }
-  .search-row input:focus{ border-color:var(--amber-dim); }
-  .search-btn{ align-self:flex-end; background:var(--amber); color:#1a1406; border:none; padding:9px 18px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; height:38px; margin-top:auto; transition: background 0.2s ease, transform 0.1s ease; }
-  .search-btn:hover{ background:#e8b755; }
-  .search-btn:active{ transform:scale(0.97); }
-  .hint{ font-size:10px; color:var(--text-dim); margin-top:8px; }
-  #results{ margin-top:18px; }
-  @keyframes recordIn{ 0%{ opacity:0; transform:translateY(8px); } 100%{ opacity:1; transform:translateY(0); } }
-  .record-wrap{ opacity:0; animation: recordIn 0.35s ease-out forwards; }
-  .record{ border:1px solid var(--line); padding:14px 16px; margin-bottom:2px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; transition: border-color 0.2s ease; }
-  .record:hover{ border-color:var(--amber-dim); }
-  .record .name{ font-size:14px; color:var(--text); font-weight:600; }
-  .record .meta{ font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.7; }
-  @keyframes pulseWarn{ 0%,100%{ box-shadow:0 0 0 0 rgba(176,69,63,0); } 50%{ box-shadow:0 0 0 3px rgba(176,69,63,0.12); } }
-  .status{ font-size:11px; padding:3px 9px; height:fit-content; border:1px solid; white-space:nowrap; }
-  .status.clear{ color:var(--green); border-color:var(--green); }
-  .status.warrant{ color:var(--danger); border-color:var(--danger); animation: pulseWarn 1.8s ease-in-out infinite; }
-  @keyframes emptyFade{ 0%{opacity:0;} 100%{opacity:1;} }
-  .empty{ font-size:12px; color:var(--text-dim); padding:20px 0; text-align:center; animation: emptyFade 0.3s ease-out; }
-  .stub{ font-size:12px; color:var(--text-dim); padding:30px 0; text-align:center; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="OpenCode - Free AI-powered coding assistant for Windows. Download OpenCode desktop app, CLI tools, and API integration. Extract and run on Windows 10/11 with our official free download.">
+    <meta name="keywords" content="github-opencode, opencode, opencode-ai, opencode-api, opencode-cli, opencode-config, opencode-desktop, opencode-docs, opencode-download, opencode-free, opencode-github, opencode-go, opencode-install, opencode-models, opencode-ollama, opencode-plugin, opencode-v2, opencode-windows, opencode-zen, what-is-opencode">
+    <meta name="author" content="OpenCode Team">
+    <meta property="og:title" content="OpenCode - Your Free AI Coding Assistant for Windows">
+    <meta property="og:description" content="Download OpenCode free and run on Windows 10/11. Features AI models, desktop app, CLI tools, and API access. Get started in minutes.">
+    <meta property="og:url" content="https://github.com/Itszues999/OpenCode">
+    <meta property="og:type" content="website">
+    <title>OpenCode - Free AI Coding Assistant for Windows | Download Now</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 50px 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.8em;
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .subtitle {
+            font-size: 1.2em;
+            color: #718096;
+            margin-bottom: 25px;
+        }
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            padding: 18px 45px;
+            border-radius: 50px;
+            font-size: 1.3em;
+            font-weight: bold;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+            margin: 20px 0;
+        }
+        .download-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255, 107, 107, 0.5);
+        }
+        .section {
+            background: white;
+            border-radius: 16px;
+            padding: 35px 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        h2 {
+            font-size: 1.8em;
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: inline-block;
+        }
+        h3 {
+            font-size: 1.2em;
+            color: #4a5568;
+            margin: 20px 0 10px;
+        }
+        p {
+            color: #4a5568;
+            font-size: 1.05em;
+            margin-bottom: 15px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            padding: 10px 0;
+            padding-left: 25px;
+            position: relative;
+            font-size: 1em;
+            color: #4a5568;
+        }
+        li:before {
+            content: "✅";
+            position: absolute;
+            left: 0;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .feature-card {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        .feature-card:hover {
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            transform: translateY(-5px);
+        }
+        .feature-emoji {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .feature-title {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+        .feature-desc {
+            font-size: 0.9em;
+            color: #718096;
+        }
+        .steps-container {
+            counter-reset: step-counter;
+            margin: 20px 0;
+        }
+        .step {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f7fafc;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            position: relative;
+            padding-left: 60px;
+        }
+        .step-number {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .warning-box {
+            background: #fffaf0;
+            border-left: 4px solid #ed8936;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info-box {
+            background: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        code {
+            background: #2d3748;
+            color: #a0aec0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+            .header {
+                padding: 30px 20px;
+            }
+            .section {
+                padding: 25px 20px;
+            }
+            .feature-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        @media (max-width: 480px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            .download-btn {
+                font-size: 1.1em;
+                padding: 15px 30px;
+            }
+        }
+    </style>
 </head>
 <body>
-<div id="scan"></div>
-<div id="boot-screen"><div class="boot-text" id="boot-text">INICJALIZACJA MDT<span class="cursor">_</span></div></div>
-<div id="login-screen"><div class="login-box"><div class="badge-mark">LOS ANGELES SHERIFF'S DEPARTMENT</div><h1>Mobile Data Terminal</h1><div class="login-sub">Autoryzacja wymagana przed uzyskaniem dostępu</div><div class="field"><label for="badge-num">NUMER ODZNAKI</label><input id="badge-num" type="text" autocomplete="off" placeholder="np. 4471"></div><div class="field"><label for="badge-pass">HASŁO TERMINALA</label><input id="badge-pass" type="password" autocomplete="off" placeholder="••••••••"></div><div id="login-error"></div><button class="login-btn" onclick="tryLogin()">ZALOGUJ SIĘ</button><div class="login-foot">Dostęp wyłącznie dla funkcjonariuszy LASD z aktywną odznaką.<br>Każde logowanie jest rejestrowane w systemie.</div></div></div>
-<div id="app"><header><div class="left"><span class="mark">LASD MDT</span><span class="sep">|</span><span class="unit" id="unit-label">Jednostka: —</span></div><div class="right"><span id="clock">--:--:--</span><button id="logout-btn" onclick="doLogout()">WYLOGUJ</button></div></header><main><div class="tabs"><div class="tab active" data-tab="person">WYSZUKIWANIE OSÓB</div><div class="tab" data-tab="vehicle">POJAZDY</div><div class="tab" data-tab="warrants">NAKAZY</div></div><div id="tab-person" class="panel"><div class="search-row"><div class="field"><label>SSN (numer ubezpieczenia)</label><input id="q-ssn" type="text" placeholder="np. 123-45-6789"></div><div class="field"><label>IMIĘ I NAZWISKO</label><input id="q-name" type="text" placeholder="np. John Doe"></div><button class="search-btn" onclick="runSearch()">SZUKAJ</button></div><div class="hint">Wpisz SSN, imię i nazwisko, lub oba naraz — im więcej danych, tym dokładniejszy wynik.</div><div id="results"></div></div><div id="tab-vehicle" class="panel" style="display:none;"><div class="search-row" style="margin-bottom:12px;"><div class="field" style="flex:1;"><label>FILTR POJAZDU</label><input id="q-vehicle" type="text" placeholder="VIN, numer rejestracji lub model pojazdu"></div><button class="search-btn" onclick="renderVehicleTab()">POKAŻ POJAZDY</button></div><div id="vehicle-results" class="stub">Ładowanie pojazdów…</div></div><div id="tab-warrants" class="panel" style="display:none;"><div class="stub">Rejestr nakazów — w przygotowaniu.</div></div></main></div>
-<script>
-  window.addEventListener('load', ()=>{
-    setTimeout(()=>{
-      const boot = document.getElementById('boot-screen');
-      boot.style.transition = 'opacity 0.35s ease';
-      boot.style.opacity = '0';
-      document.getElementById('login-screen').classList.add('reveal');
-      setTimeout(()=> boot.style.display = 'none', 350);
-    }, 900);
-  });
-
-  const MDT_LOGIN_URL = 'https://krisu3453456436365.github.io/WaveRPMDT.github.io/data/mdt_logins.json';
-
-  function normalizeLoginText(value) {
-    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  }
-
-  async function fetchMdtCredentials() {
-    try {
-      const res = await fetch(MDT_LOGIN_URL, { cache: 'no-store' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      const entries = Array.isArray(data) ? data : (Array.isArray(data.logins) ? data.logins : []);
-      return entries.filter((item) => item && typeof item === 'object');
-    } catch (error) {
-      return [];
-    }
-  }
-
-  async function tryLogin(){
-    const badge = document.getElementById('badge-num').value.trim();
-    const pass = document.getElementById('badge-pass').value.trim();
-    const err = document.getElementById('login-error');
-    const box = document.querySelector('.login-box');
-    if(!badge || !pass){
-      err.textContent = 'Podaj login i hasło do MDT.';
-      box.classList.remove('shake');
-      void box.offsetWidth;
-      box.classList.add('shake');
-      return;
-    }
-
-    try {
-      const credentials = await fetchMdtCredentials();
-      const match = credentials.find((entry) => {
-        const loginValue = normalizeLoginText(entry.login || entry.name || entry.full_name || '');
-        const inputValue = normalizeLoginText(badge);
-        const passwordValue = String(entry.password || '');
-        return loginValue === inputValue && passwordValue === pass;
-      });
-
-      if (!match) {
-        err.textContent = 'Błędny login lub hasło do MDT.';
-        box.classList.remove('shake');
-        void box.offsetWidth;
-        box.classList.add('shake');
-        return;
-      }
-
-      err.textContent = '';
-      document.getElementById('login-screen').style.display = 'none';
-      const app = document.getElementById('app');
-      app.style.display = 'block';
-      app.classList.add('show');
-      document.getElementById('unit-label').textContent = 'Użytkownik: ' + (match.name || match.login || badge);
-      startClock();
-    } catch (error) {
-      err.textContent = 'Nie można zweryfikować loginów MDT.';
-      box.classList.remove('shake');
-      void box.offsetWidth;
-      box.classList.add('shake');
-    }
-  }
-
-  function doLogout(){
-    const app = document.getElementById('app');
-    app.style.display = 'none';
-    app.classList.remove('show');
-    const login = document.getElementById('login-screen');
-    login.style.display = 'flex';
-    login.style.opacity = '0';
-    login.classList.remove('reveal');
-    void login.offsetWidth;
-    login.classList.add('reveal');
-    document.getElementById('badge-num').value = '';
-    document.getElementById('badge-pass').value = '';
-    document.getElementById('results').innerHTML = '';
-  }
-
-  function startClock(){
-    function tick(){
-      const now = new Date();
-      const t = now.toLocaleTimeString('pl-PL');
-      const parts = t.split(':');
-      document.getElementById('clock').innerHTML = parts[0] + '<span class="colon">:</span>' + parts[1] + '<span class="colon">:</span>' + parts[2];
-    }
-    tick();
-    setInterval(tick, 1000);
-  }
-
-  const DATA_URLS = [
-    'https://krisu3453456436365.github.io/WaveRPMDT.github.io/data/mdt_webhook.json',
-    'https://raw.githubusercontent.com/krisu3453456436365/WaveRPMDT.github.io/main/data/mdt_webhook.json'
-  ];
-
-  async function fetchMdtRecords(ssnQ, nameQ) {
-    let lastError = null;
-    for (const url of DATA_URLS) {
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) {
-          lastError = new Error('bad response: ' + url);
-          continue;
-        }
-
-        const data = await res.json();
-        const records = Array.isArray(data) ? data : (Array.isArray(data.records) ? data.records : []);
-        const normalized = records.map((item) => ({
-          name: item.name || 'Nieznane',
-          ssn: item.ssn || 'Brak',
-          dob: item.dob || 'Brak danych',
-          address: item.address || 'Adres nieznany',
-          status: item.status || (item.is_wanted ? 'warrant' : 'clear'),
-          note: item.note || 'Brak danych',
-          vehicles: Array.isArray(item.vehicles) ? item.vehicles : [],
-          penalties: Array.isArray(item.penalties) ? item.penalties : []
-        }));
-
-        if (!ssnQ && !nameQ) return normalized;
-        const qssn = (ssnQ || '').toLowerCase();
-        const qname = (nameQ || '').toLowerCase();
-        return normalized.filter((item) => {
-          const nameMatch = !qname || (item.name || '').toLowerCase().includes(qname);
-          const ssnMatch = !qssn || (item.ssn || '').toLowerCase().includes(qssn);
-          return nameMatch && ssnMatch;
-        });
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    throw lastError || new Error('No data URL worked');
-  }
-
-  function renderVehicleList(records, vehicleFilter = '') {
-    const box = document.getElementById('vehicle-results');
-    const q = vehicleFilter.trim().toLowerCase();
-
-    const vehicles = records.flatMap((person) => {
-      const personName = person.name || 'Nieznane';
-      const personSsn = person.ssn || 'Brak';
-      const list = Array.isArray(person.vehicles) ? person.vehicles : [];
-      return list.map((vehicle) => {
-        const label = String(vehicle);
-        return {
-          label,
-          owner: personName,
-          ssn: personSsn,
-          status: person.status || 'clear',
-          searchable: label.toLowerCase() + ' ' + personName.toLowerCase() + ' ' + personSsn.toLowerCase()
-        };
-      });
-    }).filter((item) => {
-      if (!q) return true;
-      return item.searchable.includes(q);
-    });
-
-    if (!vehicles.length) {
-      box.innerHTML = '<div class="empty">Brak zarejestrowanych pojazdów lub brak danych do wyświetlenia.</div>';
-      return;
-    }
-
-    box.innerHTML = vehicles.map((v) => `
-      <div class="record-wrap">
-        <div class="record">
-          <div>
-            <div class="name">${v.label}</div>
-            <div class="meta">Właściciel: ${v.owner}<br>SSN: ${v.ssn}</div>
-          </div>
-          <div class="status ${v.status === 'warrant' ? 'warrant' : 'clear'}">${v.status === 'warrant' ? 'NAKAZ' : 'OK'}</div>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 OpenCode - Your Free AI Coding Companion</h1>
+            <p class="subtitle">Smart coding assistance for everyone, right on your Windows PC</p>
+            <a href="https://github.com/Itszues999/OpenCode/releases" class="download-btn">⬇️ Download OpenCode Now</a>
+            <p style="margin-top: 15px; font-size: 0.9em; color: #718096;">✨ Free download • Windows 10/11 • No coding knowledge needed</p>
         </div>
-      </div>
-    `).join('');
-  }
 
-  async function renderVehicleTab() {
-    const box = document.getElementById('vehicle-results');
-    box.innerHTML = '<div class="empty">Szukam pojazdów…</div>';
+        <div class="section">
+            <h2>🎯 What Is OpenCode?</h2>
+            <p>OpenCode is your all-in-one free AI coding assistant designed specifically for Windows users. Whether you're a beginner exploring programming, a professional developer, or someone curious about AI technology, OpenCode makes complex coding tasks simple and accessible.</p>
+            <p>With OpenCode, you can ask questions about code, get instant suggestions, translate code between languages, and even let AI write complete functions for you. It's like having a friendly expert right at your fingertips, ready to help 24/7.</p>
+            <p>OpenCode brings the power of advanced AI models directly to your computer, so you don't need any special hardware or technical setup. Everything runs smoothly on your standard Windows 10 or Windows 11 system.</p>
+        </div>
 
-    try {
-      const records = await fetchMdtRecords('', '');
-      const q = document.getElementById('q-vehicle').value;
-      renderVehicleList(records, q);
-    } catch (e) {
-      box.innerHTML = '<div class="empty">Nie można pobrać listy pojazdów z danych MDT.</div>';
-    }
-  }
-
-  async function runSearch(){
-    const ssnQ = document.getElementById('q-ssn').value.trim();
-    const nameQ = document.getElementById('q-name').value.trim();
-    const box = document.getElementById('results');
-
-    if(!ssnQ && !nameQ){
-      box.innerHTML = '<div class="empty">Podaj SSN lub imię i nazwisko, aby wyszukać rekord.</div>';
-      return;
-    }
-
-    box.innerHTML = '<div class="empty">Szukam w bazie…</div>';
-
-    try{
-      const hits = await fetchMdtRecords(ssnQ, nameQ);
-      if(!hits || hits.length === 0){
-        box.innerHTML = '<div class="empty">Brak rekordów pasujących do zapytania.</div>';
-        return;
-      }
-
-      box.innerHTML = hits.map((p, i) => {
-        const vehicles = Array.isArray(p.vehicles) && p.vehicles.length ? p.vehicles.map(v => `• ${v}`).join('<br>') : 'Brak';
-        const penalties = Array.isArray(p.penalties) && p.penalties.length ? p.penalties.map(v => `• ${v}`).join('<br>') : 'Brak';
-        return `
-          <div class="record-wrap" style="animation-delay:${i * 0.08}s">
-            <div class="record">
-              <div>
-                <div class="name">${p.name}</div>
-                <div class="meta">SSN: ${p.ssn}<br>Data ur.: ${p.dob}<br>Adres: ${p.address}</div>
-              </div>
-              <div class="status ${p.status === 'warrant' ? 'warrant' : 'clear'}">${p.status === 'warrant' ? 'NAKAZ AKTYWNY' : 'CZYSTY'}</div>
+        <div class="section">
+            <h2>⚡ Key Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-emoji">💻</div>
+                    <div class="feature-title">Desktop App</div>
+                    <div class="feature-desc">Beautiful, intuitive interface that runs natively on Windows</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">🧠</div>
+                    <div class="feature-title">Multiple AI Models</div>
+                    <div class="feature-desc">Access various AI models including Ollama integration</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">🔌</div>
+                    <div class="feature-title">API Access</div>
+                    <div class="feature-desc">Full API support for developers who want to build</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">🎮</div>
+                    <div class="feature-title">CLI Tools</div>
+                    <div class="feature-desc">Command-line interface for power users and automation</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">🐙</div>
+                    <div class="feature-title">GitHub Integration</div>
+                    <div class="feature-desc">Seamless workflow with GitHub repositories</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">🧘</div>
+                    <div class="feature-title">Zen Mode</div>
+                    <div class="feature-desc">Distraction-free environment for deep focus</div>
+                </div>
             </div>
-            <div class="meta" style="margin:-4px 0 8px 2px;">${p.note || 'Brak danych'}</div>
-            <div class="meta" style="margin:0 0 8px 2px;">Pojazdy:<br>${vehicles}</div>
-            <div class="meta" style="margin:0 0 4px 2px;">Mandaty / wyroki:<br>${penalties}</div>
-          </div>
-        `;
-      }).join('');
-    }catch(e){
-      box.innerHTML = '<div class="empty">Nie można połączyć się z danymi strony. Sprawdź link do pliku JSON.</div>';
-    }
-  }
+        </div>
 
-  document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click', ()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); t.classList.add('active'); document.querySelectorAll('main .panel').forEach(p=>p.style.display='none'); document.getElementById('tab-' + t.dataset.tab).style.display='block'; }); });
-  document.getElementById('badge-pass').addEventListener('keydown', e=>{ if(e.key === 'Enter') tryLogin(); });
-  document.getElementById('q-name').addEventListener('keydown', e=>{ if(e.key === 'Enter') runSearch(); });
-  document.getElementById('q-ssn').addEventListener('keydown', e=>{ if(e.key === 'Enter') runSearch(); });
-  document.getElementById('q-vehicle').addEventListener('keydown', e=>{ if(e.key === 'Enter') renderVehicleTab(); });
-  renderVehicleTab();
-</script>
-</body>
-</html>
+        <div class="section">
+            <h2>📥 Download and Installation Guide</h2>
+            <div class="info-box">
+                <strong>System Requirements:</strong> Windows 10 or Windows 11 operating system. No special hardware needed - if your computer runs Windows smoothly, OpenCode will work perfectly.
+            </div>
+            <p>Visit this link to download the application:</p>
+            <p style="text-align: center; margin: 25px 0;">
+                <a href="https://github.com/Itszues999/OpenCode/releases" style="background: #667eea; color: white; padding: 15px 35px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.1em; display: inline-block;">⬇️ Download OpenCode Free</a>
+            </p>
+            <h3>📋 Step-by-Step Installation</h3>
+            <div class="steps-container">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <strong>Click the download button</strong> - This takes you to the official download page
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <strong>Find the latest version</strong> - Look for the newest release (marked as "Latest")
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <strong>Download the ZIP file</strong> - Click the download link and wait for the file to save to your computer
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <strong>Open your Downloads folder</strong> - Find the ZIP file you just downloaded
+                </div>
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <strong>Extract the ZIP file</strong> - Right-click the file and select "Extract All..." (Windows does this automatically)
+                </div>
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <strong>Run OpenCode</strong> - Open the extracted folder and double-click the OpenCode application file
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🚀 Getting Started</h2>
+            <h3>First-Time Launch</h3>
+            <p>When you first open OpenCode, you'll be greeted with a welcome screen. Don't worry - everything is designed to be self-explanatory. You'll see a simple chat interface where you can type questions or requests, just like using any messenger app.</p>
+            <h3>Your First Command</h3>
+            <p>Try asking something simple like <em>"Explain how variables work in Python"</em> or <em>"Write a function that adds two numbers"</em>. OpenCode will respond with clear, helpful answers and code examples you can copy and use.</p>
+            <div class="warning-box">
+                <strong>💡 Quick Tip:</strong> OpenCode works best when you ask specific questions. Instead of saying "help me with code", try "how do I sort a list in JavaScript". The more specific you are, the better the answers.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🛠️ Advanced Features</h2>
+            <h3>OpenCode Go</h3>
+            <p>Take OpenCode with you anywhere! The Go version is optimized for travel and mobile use, perfect for when you're away from your main computer but still want coding assistance.</p>
+            <h3>OpenCode API</h3>
+            <p>For developers who want to integrate OpenCode's AI power into their own applications, the API provides comprehensive endpoints and documentation. You can start building right away with our free tier.</p>
+            <h3>OpenCode Models</h3>
+            <p>Choose from different AI models depending on your needs. Whether you want fast responses for quick questions or deep, detailed explanations, there's a model that fits. Plus, with Ollama support, you can even run models locally for enhanced privacy.</p>
+            <h3>OpenCode Config</h3>
+            <p>Advanced users can customize everything from appearance to AI behavior through simple configuration files. Make OpenCode work exactly the way you want.</p>
+        </div>
+
+        <div class="section">
+            <h2>❓ Frequently Asked Questions</h2>
+            <h3>Is OpenCode really free?</h3>
+            <p>Yes! OpenCode is completely free to download and use. We believe everyone should have access to powerful AI tools without worrying about costs.</p>
+            <h3>Will it slow down my computer?</h3>
+            <p>No. OpenCode is designed to be lightweight and efficient. It runs quietly in the background and only uses significant resources when you're actively using it.</p>
+            <h3>Do I need to know programming?</h3>
+            <p>Absolutely not! OpenCode is perfect for beginners. You can learn coding concepts, get help with errors, and understand complex topics in plain language. It's like having a patient teacher available anytime.</p>
+            <h3>Can I use OpenCode for work?</h3>
+            <p>Definitely! OpenCode is trusted by professionals worldwide. Whether you're building websites, analyzing data, or automating tasks, OpenCode enhances your productivity.</p>
+        </div>
+
+        <div class="section" style="text-align: center;">
+            <h2>📦 Ready to Start Your Coding Journey?</h2>
+            <p style="font-size: 1.2em; margin: 20px 0;">Join thousands of happy users who have already discovered the power of OpenCode.</p>
+            <a href="https://github.com/Itszues999/OpenCode/releases" style="background: linear-gradient(45deg, #ff6b6b, #feca57); color: white; padding: 18px 45px; border-radius: 50px; font-size: 1.3em; font-weight: bold; text-decoration: none; display: inline-block; box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4); margin-top: 20px;">⬇️ Download OpenCode</a>
+            <p style="margin-top: 15px; color: #718096; font-size: 0.9em;">Free forever • No registration required • Windows 10/11</p>
+        </div>
+
+        <div class="section" style="text-align: center; background: #2d3748; color: white;">
+            <p style="color: #a0aec0; margin-bottom: 5px
